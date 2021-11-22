@@ -845,8 +845,8 @@ contains
     integer :: c    ! column index
     integer :: g    ! gridcell index
     integer :: j    ! level
+    ! Assume the irrigated rice is irrigated for 24 h per day
     integer :: irrig_nsteps_per_day_rice    ! number of time steps per day in which we irrigate for rice
-
     ! Filter for columns where we need to check for irrigation
     type(filter_col_type) :: check_for_irrig_col_filter
 
@@ -879,7 +879,7 @@ contains
     ! where do we need to check soil moisture to see if we need to irrigate?
     logical  :: check_for_irrig_patch(bounds%begp:bounds%endp)
     logical  :: check_for_irrig_col(bounds%begc:bounds%endc)
-    logical  :: check_for_irrig_rice_col(bounds%begc:bounds%endc)
+    logical  :: check_for_irrig_rice_col(bounds%begc:bounds%endc) ! check whether this patch is irrigated rice
 
     ! set to true once we have reached the max allowable depth for irrigation in a given
     ! column
@@ -950,8 +950,8 @@ contains
                 reached_max_depth(c) = .true.
              else
                 h2osoi_liq_tot(c) = h2osoi_liq_tot(c) + h2osoi_liq(c,j)
-                if check_for_irrig_rice_col(c) = .true. then 
-                   h2osoi_liq_target = this%RelsatToH2osoi( &
+                if check_for_irrig_rice_col(c) = .true. then ! If it is irrigated rice,
+                   h2osoi_liq_target = this%RelsatToH2osoi( & ! set relsat = 1.0
                         relsat = 1.0, &
                         eff_porosity = eff_porosity(c,j), &
                         dz = col%dz(c,j))
