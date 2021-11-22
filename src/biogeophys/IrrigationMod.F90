@@ -845,6 +845,7 @@ contains
     integer :: c    ! column index
     integer :: g    ! gridcell index
     integer :: j    ! level
+    integer :: irrig_nsteps_per_day_rice    ! number of time steps per day in which we irrigate for rice
 
     ! Filter for columns where we need to check for irrigation
     type(filter_col_type) :: check_for_irrig_col_filter
@@ -878,6 +879,7 @@ contains
     ! where do we need to check soil moisture to see if we need to irrigate?
     logical  :: check_for_irrig_patch(bounds%begp:bounds%endp)
     logical  :: check_for_irrig_col(bounds%begc:bounds%endc)
+    logical  :: check_for_irrig_rice_col(bounds%begc:bounds%endc)
 
     ! set to true once we have reached the max allowable depth for irrigation in a given
     ! column
@@ -902,6 +904,7 @@ contains
     ! First, determine in what grid cells we need to bother 'measuring' soil water, to see
     ! if we need irrigation
     check_for_irrig_col(bounds%begc:bounds%endc) = .false.
+    check_for_irrig_rice_col(bounds%begc:bounds%endc) = .false.
     do fp = 1, num_exposedvegp
        p = filter_exposedvegp(fp)
        g = patch%gridcell(p)
@@ -912,6 +915,9 @@ contains
        if (check_for_irrig_patch(p)) then
           c = patch%column(p)
           check_for_irrig_col(c) = .true.
+          if patch%itype(p) == n_irrig_rice then
+             check_for_irrig_rice_col(c) = .true. 
+             this%relsat_target_col(c,:) = 1
        end if
     end do
 
@@ -944,11 +950,17 @@ contains
                 reached_max_depth(c) = .true.
              else
                 h2osoi_liq_tot(c) = h2osoi_liq_tot(c) + h2osoi_liq(c,j)
-
-                h2osoi_liq_target = this%RelsatToH2osoi( &
-                     relsat = this%relsat_target_col(c,j), &
-                     eff_porosity = eff_porosity(c,j), &
-                     dz = col%dz(c,j))
+                if check_for_irrig_rice_col(c) = .true. then 
+                   h2osoi_liq_target = this%RelsatToH2osoi( &
+                        relsat = 1.0, &
+                        eff_porosity = eff_porosity(c,j), &
+                        dz = col%dz(c,j))
+                else                      
+                   h2osoi_liq_target = this%RelsatToH2osoi( &
+                        relsat = this%relsat_target_col(c,j), &
+                        eff_porosity = eff_porosity(c,j), &
+                        dz = col%dz(c,j))
+                end if
                 h2osoi_liq_target_tot(c) = h2osoi_liq_target_tot(c) + &
                      h2osoi_liq_target
 
@@ -1015,15 +1027,23 @@ contains
        c = patch%column(p)
 
        if (check_for_irrig_patch(p)) then
-          ! Convert units from mm to mm/sec
-          this%irrig_rate_patch(p) = deficit_volr_limited(c) / &
-               (this%dtime*this%irrig_nsteps_per_day)
-          this%irrig_rate_demand_patch(p) = deficit(c) / &
-               (this%dtime*this%irrig_nsteps_per_day)
+          if check_for_irrig_rice_col(c) = .true. then
+             irrig_nsteps_per_day_rice = ((isecspday + (dtime - 1))/dtime) ! assume irrig lenth to be 24h for irrig rice
+             this%irrig_rate_patch(p) = deficit_volr_limited(c) / &
+                  (this%dtime*irrig_nsteps_per_day_rice)
+             this%irrig_rate_demand_patch(p) = deficit(c) / &
+                  (this%dtime*irrig_nsteps_per_day_rice)
+             this%n_irrig_steps_left_patch(p) = irrig_nsteps_per_day_rice
+          else                          
+             ! Convert units from mm to mm/sec
+             this%irrig_rate_patch(p) = deficit_volr_limited(c) / &
+                  (this%dtime*this%irrig_nsteps_per_day)
+             this%irrig_rate_demand_patch(p) = deficit(c) / &
+                  (this%dtime*this%irrig_nsteps_per_day)
 
-          ! n_irrig_steps_left(p) > 0 is ok even if irrig_rate(p) ends up = 0
-          ! in this case, we'll irrigate by 0 for the given number of time steps
-          this%n_irrig_steps_left_patch(p) = this%irrig_nsteps_per_day
+             ! n_irrig_steps_left(p) > 0 is ok even if irrig_rate(p) ends up = 0
+             ! in this case, we'll irrigate by 0 for the given number of time steps
+             this%n_irrig_steps_left_patch(p) = this%irrig_nsteps_per_day
        end if
     end do
 
