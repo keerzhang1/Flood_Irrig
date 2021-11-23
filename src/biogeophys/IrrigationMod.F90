@@ -60,6 +60,7 @@ module IrrigationMod
   use PatchType        , only : patch                
   use subgridAveMod    , only : p2c, c2g
   use filterColMod     , only : filter_col_type, col_filter_from_logical_array
+  use pftconMod        , only : n_irrig_rice
   !
   implicit none
   private
@@ -917,7 +918,7 @@ contains
           check_for_irrig_col(c) = .true.
           if patch%itype(p) == n_irrig_rice then
              check_for_irrig_rice_col(c) = .true. 
-             this%relsat_target_col(c,:) = 1
+             !this%relsat_target_col(c,:) = 1
        end if
     end do
 
