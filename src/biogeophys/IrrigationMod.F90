@@ -60,7 +60,7 @@ module IrrigationMod
   use PatchType        , only : patch                
   use subgridAveMod    , only : p2c, c2g
   use filterColMod     , only : filter_col_type, col_filter_from_logical_array
-  use pftconMod        , only : n_irrig_rice
+  use pftconMod        , only : nirrig_rice
   !
   implicit none
   private
@@ -916,9 +916,10 @@ contains
        if (check_for_irrig_patch(p)) then
           c = patch%column(p)
           check_for_irrig_col(c) = .true.
-          if patch%itype(p) == n_irrig_rice then
+          if (patch%itype(p) == nirrig_rice) then
              check_for_irrig_rice_col(c) = .true. 
-             !this%relsat_target_col(c,:) = 1
+             this%relsat_target_col(c,:) = 1
+          end if
        end if
     end do
 
@@ -951,9 +952,10 @@ contains
                 reached_max_depth(c) = .true.
              else
                 h2osoi_liq_tot(c) = h2osoi_liq_tot(c) + h2osoi_liq(c,j)
-                if check_for_irrig_rice_col(c) = .true. then ! If it is irrigated rice,
-                   h2osoi_liq_target = this%RelsatToH2osoi( & ! set relsat = 1.0
-                        relsat = 1.0, &
+                if (check_for_irrig_rice_col(c)) then ! If it is irrigated rice,
+                   this%relsat_target_col(c,:) = 1.0
+                   h2osoi_liq_target = this%RelsatToH2osoi( & ! set relsat = 1
+                        relsat = this%relsat_target_col(c,j), &
                         eff_porosity = eff_porosity(c,j), &
                         dz = col%dz(c,j))
                 else                      
@@ -1028,8 +1030,8 @@ contains
        c = patch%column(p)
 
        if (check_for_irrig_patch(p)) then
-          if check_for_irrig_rice_col(c) = .true. then
-             irrig_nsteps_per_day_rice = ((isecspday + (dtime - 1))/dtime) ! assume irrig lenth to be 24h for irrig rice
+          if (check_for_irrig_rice_col(c)) then
+             irrig_nsteps_per_day_rice = ((isecspday + (this%dtime - 1))/this%dtime) ! assume irrig lenth to be 24h for irrig rice
              this%irrig_rate_patch(p) = deficit_volr_limited(c) / &
                   (this%dtime*irrig_nsteps_per_day_rice)
              this%irrig_rate_demand_patch(p) = deficit(c) / &
@@ -1045,6 +1047,7 @@ contains
              ! n_irrig_steps_left(p) > 0 is ok even if irrig_rate(p) ends up = 0
              ! in this case, we'll irrigate by 0 for the given number of time steps
              this%n_irrig_steps_left_patch(p) = this%irrig_nsteps_per_day
+          end if
        end if
     end do
 
