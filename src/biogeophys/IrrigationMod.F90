@@ -60,7 +60,7 @@ module IrrigationMod
   use PatchType        , only : patch                
   use subgridAveMod    , only : p2c, c2g
   use filterColMod     , only : filter_col_type, col_filter_from_logical_array
-  use pftconMod        , only : nirrig_rice,nrice
+  use pftconMod        , only : nirrig_rice
   !
   implicit none
   private
@@ -916,11 +916,12 @@ contains
        if (check_for_irrig_patch(p)) then
           c = patch%column(p)
           check_for_irrig_col(c) = .true.
-          if (patch%itype(p) == nirrig_rice .or. patch%itype(p) == nrice) then
-             check_for_irrig_rice_col(c) = .true. 
-             this%relsat_target_col(c,:) = 1
-          end if
        end if
+       if (patch%itype(p) == nirrig_rice) then
+          c = patch%column(p)
+          check_for_irrig_rice_col(c) = .true. 
+          this%relsat_target_col(c,:) = 1
+       end if       
     end do
 
     check_for_irrig_col_filter = col_filter_from_logical_array(bounds, &
@@ -1078,8 +1079,8 @@ contains
     character(len=*), parameter :: subname = 'PointNeedsCheckForIrrig'
     !-----------------------------------------------------------------------
     
-    if (pftcon%irrigated(pft_type) == 1._r8 .and. &
-         elai > this%params%irrig_min_lai) then
+    if ((pftcon%irrigated(pft_type) == 1._r8 .and. &
+         elai > this%params%irrig_min_lai) .or. (pft_type == nirrig_rice)) then
        ! see if it's the right time of day to start irrigating:
        seconds_since_irrig_start_time = get_local_time( londeg, starttime=this%params%irrig_start_time, offset=-this%dtime )
        if (seconds_since_irrig_start_time < this%dtime) then
